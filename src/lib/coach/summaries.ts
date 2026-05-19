@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { addDays, dayStart, isoDay, mondayOf } from "@/lib/dates";
+import { addDays, dayStart, isoDay, sundayOf } from "@/lib/dates";
 
 export type WeeklyTotal = {
   weekStart: string;
@@ -55,7 +55,7 @@ function toMiles(distance: number, unit: string | null): number {
 }
 
 export async function weeklyTotals(weeks = 4, now = new Date()): Promise<WeeklyTotal[]> {
-  const firstWeekStart = mondayOf(addDays(now, -7 * (weeks - 1)));
+  const firstWeekStart = sundayOf(addDays(now, -7 * (weeks - 1)));
   const since = firstWeekStart;
   const workouts = await prisma.workout.findMany({
     where: { date: { gte: since } },
@@ -77,7 +77,7 @@ export async function weeklyTotals(weeks = 4, now = new Date()): Promise<WeeklyT
   }
 
   for (const w of workouts) {
-    const wkStart = isoDay(mondayOf(new Date(w.date)));
+    const wkStart = isoDay(sundayOf(new Date(w.date)));
     const b = buckets[wkStart];
     if (!b) continue;
     if (w.durationMin) b.totalDurationMin += w.durationMin;

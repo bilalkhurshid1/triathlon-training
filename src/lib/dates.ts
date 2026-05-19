@@ -27,6 +27,13 @@ export function mondayOf(d: Date): Date {
   return day;
 }
 
+export function sundayOf(d: Date): Date {
+  const day = dayStart(d);
+  const dow = day.getDay(); // 0=Sun..6=Sat
+  day.setDate(day.getDate() - dow);
+  return day;
+}
+
 export function addDays(d: Date, n: number): Date {
   const x = new Date(d);
   x.setDate(x.getDate() + n);
