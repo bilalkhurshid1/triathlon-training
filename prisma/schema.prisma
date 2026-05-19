@@ -1,0 +1,125 @@
+// Local-first triathlon coach data model.
+// SQLite for the MVP; portable to Postgres later by swapping the datasource.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Workout {
+  id           String   @id @default(cuid())
+  date         DateTime
+  type         String
+  title        String?
+  durationMin  Int?
+  distance     Float?
+  distanceUnit String?
+  rpe          Int?
+  soreness     Int?
+  notes        String?
+  source       String   @default("manual")
+  externalId   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  metrics   WorkoutMetric[]
+  importRef ActivityImport? @relation(fields: [importId], references: [id])
+  importId  String?
+
+  @@unique([source, externalId])
+  @@index([date])
+  @@index([type, date])
+}
+
+model WorkoutMetric {
+  id        String  @id @default(cuid())
+  workoutId String
+  workout   Workout @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  key       String
+  valueNum  Float?
+  valueText String?
+  unit      String?
+
+  @@index([workoutId, key])
+}
+
+model Race {
+  id         String   @id @default(cuid())
+  name       String
+  date       DateTime
+  swimYards  Int?
+  bikeMiles  Float?
+  runMiles   Float?
+  goals      String?
+  notes      String?
+  isPrimary  Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Profile {
+  id                  String   @id @default("me")
+  displayName         String?
+  goals               String?
+  nutritionPrefs      String?
+  trainingConstraints String?
+  injuries            String?
+  assumptions         String?
+  coachingPrefs       String?
+  weaknesses          String?
+  updatedAt           DateTime @updatedAt
+}
+
+model ChatMessage {
+  id          String   @id @default(cuid())
+  role        String
+  content     String
+  provider    String?
+  model       String?
+  contextJson String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model Settings {
+  id                   String   @id @default("default")
+  provider             String   @default("anthropic")
+  model                String   @default("claude-opus-4-7")
+  systemPromptOverride String?
+  updatedAt            DateTime @updatedAt
+}
+
+model ExternalAccount {
+  id           String    @id @default(cuid())
+  provider     String
+  accountLabel String?
+  accessToken  String?
+  refreshToken String?
+  expiresAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  imports ActivityImport[]
+
+  @@unique([provider, accountLabel])
+}
+
+model ActivityImport {
+  id          String           @id @default(cuid())
+  source      String
+  rawText     String?
+  rawJson     String?
+  rawFilePath String?
+  parsedAt    DateTime?
+  parseError  String?
+  accountId   String?
+  account     ExternalAccount? @relation(fields: [accountId], references: [id])
+  createdAt   DateTime         @default(now())
+
+  workouts Workout[]
+}

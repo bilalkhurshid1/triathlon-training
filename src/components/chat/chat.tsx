@@ -1,0 +1,78 @@
+"use client";
+
+import { useState } from "react";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
+import Markdown from "react-markdown";
+
+export function Chat() {
+  const { messages, sendMessage, status, error } = useChat({
+    transport: new DefaultChatTransport({ api: "/api/chat" }),
+  });
+
+  const [input, setInput] = useState("");
+  const isStreaming = status === "submitted" || status === "streaming";
+
+  return (
+    <div className="rounded border border-zinc-200 bg-white flex flex-col h-[70vh]">
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+        {messages.length === 0 && (
+          <div className="text-sm text-zinc-500">
+            Ask the coach. They have your last 14 days of workouts, your profile, and your race date.
+          </div>
+        )}
+        {messages.map((m) => {
+          const text = m.parts
+            .filter((p) => p.type === "text")
+            .map((p) => (p as { type: "text"; text: string }).text)
+            .join("");
+          return (
+            <div key={m.id} className="text-sm">
+              <span className="text-xs uppercase tracking-wide text-zinc-500 block mb-0.5">
+                {m.role}
+              </span>
+              {m.role === "assistant" ? (
+                <div className="prose prose-sm prose-zinc max-w-none">
+                  <Markdown>{text}</Markdown>
+                </div>
+              ) : (
+                <span className="whitespace-pre-wrap">{text}</span>
+              )}
+            </div>
+          );
+        })}
+        {isStreaming && <div className="text-xs text-zinc-400">…</div>}
+        {error && (
+          <div className="text-xs text-red-600 whitespace-pre-wrap">
+            error: {error.message}
+          </div>
+        )}
+      </div>
+
+      <form
+        className="border-t border-zinc-200 p-2 flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!input.trim() || isStreaming) return;
+          sendMessage({ text: input });
+          setInput("");
+        }}
+      >
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="ask the coach…"
+          className="flex-1 rounded border border-zinc-300 px-3 py-2 text-sm bg-white focus:outline-none focus:border-zinc-500"
+          disabled={isStreaming}
+        />
+        <button
+          type="submit"
+          disabled={isStreaming || !input.trim()}
+          className="rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-40"
+        >
+          send
+        </button>
+      </form>
+    </div>
+  );
+}

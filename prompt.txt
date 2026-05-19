@@ -1,0 +1,192 @@
+I want you to create a detailed implementation plan for a local-first triathlon coach web app.
+
+Context:
+I am training for a sprint triathlon on August 23. The race distances are:
+- Swim: 803 yards
+- Bike: 15.4 miles
+- Run: 5K
+
+I currently track workouts manually in a plain text file called training-diary.txt. I want to build a web app where I can:
+- Log workouts
+- Edit past workouts
+- Track swim/bike/run/lifting/rest days
+- Maintain a personal profile with assumptions about me, my goals, injuries, preferences, and training constraints
+- Maintain race/event details
+- Chat with an LLM coach that understands my profile, race date, recent workouts, training history, current weaknesses, and trends
+- Choose between Anthropic and OpenAI models
+- Eventually support Garmin, COROS, Strava, or FIT/GPX/TCX imports
+
+Important product goals:
+- Local-first MVP
+- Easy to run locally
+- Easy to self-host later on a homelab
+- Simple enough to actually build and use quickly
+- Future-proof enough to support structured training analytics later
+
+Preferred stack:
+- Next.js 14+ App Router
+- TypeScript
+- Tailwind CSS
+- SQLite for local-first database
+- Prisma ORM
+- Anthropic + OpenAI support
+- Prefer Vercel AI SDK if it makes model switching and streaming easier
+- Do not use a separate Python backend for the MVP
+- But design the architecture so a Python ingestion/analytics worker could be added later for Garmin/COROS/FIT/GPX/TCX parsing
+
+I do NOT want a generic diary app. I want the data model to support structured training analysis.
+
+Please create a comprehensive implementation plan with:
+
+1. Recommended architecture
+Explain why Next.js + SQLite + Prisma is appropriate for the MVP and how it can later expand to wearable imports or a Python worker.
+
+2. Prisma data model
+Design a better schema than a simple DiaryEntry model.
+
+Include models such as:
+- Workout
+- Race
+- Profile
+- ChatMessage
+- Optional WorkoutMetric
+- Optional ExternalAccount or ActivityImport for future wearable support
+
+The Workout model should include structured fields like:
+- date
+- type: swim, bike, run, lift, rest, brick, other
+- title
+- durationMin
+- distance
+- distanceUnit
+- rpe
+- soreness
+- notes
+- source: manual, garmin, coros, strava, file_import
+- createdAt
+- updatedAt
+
+The Race model should include:
+- race date
+- swim yards
+- bike miles
+- run miles
+- goals/notes
+
+The Profile model should include:
+- goals
+- nutrition preferences
+- training constraints
+- injuries/soreness notes
+- key assumptions
+- LLM coaching preferences
+
+3. Project structure
+Give a complete folder/file structure for the Next.js app.
+
+Include:
+- app routes
+- API routes
+- Prisma files
+- import scripts
+- lib files for database, LLM provider abstraction, coach context building, training summaries, and prompt generation
+
+4. Pages and features
+Design the MVP screens:
+- Dashboard
+- Diary/workout log
+- Add/edit workout form
+- Profile page
+- Race page
+- Chat coach page
+
+5. API routes/server actions
+Specify the routes or server actions needed:
+- create workout
+- edit workout
+- delete workout
+- get workouts
+- update profile
+- update race
+- chat with coach
+- import training-diary.txt
+
+6. LLM coach architecture
+Do not just dump the full training diary into the prompt forever.
+
+Design a context builder that includes:
+- today's date
+- race date and days remaining
+- race distances
+- profile assumptions
+- known weaknesses
+- recent workouts, especially last 14–30 days
+- weekly training totals
+- injury/soreness warnings
+- relevant older milestones
+- current user question
+
+Explain how the LLM should receive structured context instead of raw database dumps.
+
+7. Prompt design
+Write an example system prompt for the LLM coach.
+
+The coach should:
+- act like a practical endurance + strength coach
+- prioritize safe progressive overload
+- know the user is trying to lose belly fat, build some muscle, and complete the triathlon
+- avoid overtraining
+- pay special attention to swimming because it is the weakest discipline
+- consider soreness, recovery, recent training load, and schedule
+- give specific workout and nutrition recommendations
+
+8. Import script
+Design a script that imports my existing training-diary.txt.
+
+The input may be messy and semi-structured, like:
+- dates
+- activity descriptions
+- notes
+- distances
+- times
+- subjective comments
+
+The script should parse as much structure as possible and preserve the original text in notes.
+
+9. Future Garmin/COROS/Strava support
+Explain how to design now for future integrations.
+
+Include:
+- raw import table
+- normalized workouts table
+- source field
+- provider activity IDs
+- file upload support for FIT/GPX/TCX
+- later Python worker option
+- why the LLM should use normalized summaries instead of raw wearable JSON
+
+10. Implementation steps
+Give an ordered build plan:
+- scaffold app
+- setup Prisma
+- create schema
+- create seed/import script
+- build workout CRUD
+- build profile/race pages
+- build coach context builder
+- build chat UI
+- add provider toggle
+- add dashboard summaries
+- add future import hooks
+
+11. Verification checklist
+Include concrete tests such as:
+- import diary works
+- adding workout updates dashboard
+- coach knows what I did last week
+- coach knows race date and days remaining
+- coach warns if I stack too many hard workouts
+- provider toggle works between Anthropic and OpenAI
+- profile changes affect next coach response
+
+Deliver the output as a practical engineering plan with code snippets where useful, but do not write the full app yet.
