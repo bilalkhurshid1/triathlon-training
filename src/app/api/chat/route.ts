@@ -22,7 +22,10 @@ function lastUserText(messages: UIMessage[]): string {
 }
 
 export async function POST(req: Request) {
-  const { messages } = (await req.json()) as { messages: UIMessage[] };
+  const { messages, sessionId } = (await req.json()) as {
+    messages: UIMessage[];
+    sessionId?: string;
+  };
 
   const [profile, race, settings] = await Promise.all([
     prisma.profile.findUnique({ where: { id: "me" } }),
@@ -40,8 +43,25 @@ export async function POST(req: Request) {
   const contextBlock = contextToMarkdown(ctx);
 
   await prisma.chatMessage.create({
-    data: { role: "user", content: userMsg, contextJson: JSON.stringify(ctx) },
+    data: {
+      role: "user",
+      content: userMsg,
+      contextJson: JSON.stringify(ctx),
+      sessionId: sessionId ?? null,
+    },
   });
+
+  if (sessionId) {
+    const userMsgCount = await prisma.chatMessage.count({
+      where: { sessionId, role: "user" },
+    });
+    if (userMsgCount === 1) {
+      await prisma.coachSession.update({
+        where: { id: sessionId },
+        data: { title: userMsg.slice(0, 40).trim() || "New session" },
+      });
+    }
+  }
 
   // Convert UI messages -> model messages, then prepend the structured context
   // to the last user message so the model sees it alongside the question.
@@ -70,6 +90,7 @@ export async function POST(req: Request) {
           content: text,
           provider: settings.provider,
           model: settings.model,
+          sessionId: sessionId ?? null,
         },
       });
     },

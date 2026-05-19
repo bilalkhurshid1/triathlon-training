@@ -74,16 +74,30 @@ model Profile {
   updatedAt           DateTime @updatedAt
 }
 
+model CoachSession {
+  id        String        @id @default(cuid())
+  title     String        @default("New session")
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  messages  ChatMessage[]
+
+  @@index([createdAt])
+}
+
 model ChatMessage {
-  id          String   @id @default(cuid())
+  id          String        @id @default(cuid())
   role        String
   content     String
   provider    String?
   model       String?
   contextJson String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime      @default(now())
+  sessionId   String?
+  session     CoachSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([createdAt])
+  @@index([sessionId, createdAt])
 }
 
 model Settings {

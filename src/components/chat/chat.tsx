@@ -1,20 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
+import { useRouter } from "next/navigation";
 import Markdown from "react-markdown";
+import type { UIMessage } from "ai";
 
-export function Chat() {
+type Props = {
+  sessionId: string;
+  initialMessages: UIMessage[];
+};
+
+export function Chat({ sessionId, initialMessages }: Props) {
+  const router = useRouter();
+  const hasRefreshedRef = useRef(false);
+
   const { messages, sendMessage, status, error } = useChat({
-    transport: new DefaultChatTransport({ api: "/api/chat" }),
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+      body: { sessionId },
+    }),
+    messages: initialMessages,
+    onFinish: () => {
+      if (!hasRefreshedRef.current) {
+        hasRefreshedRef.current = true;
+        router.refresh();
+      }
+    },
   });
 
   const [input, setInput] = useState("");
   const isStreaming = status === "submitted" || status === "streaming";
 
   return (
-    <div className="rounded border border-zinc-200 bg-white flex flex-col h-[70vh]">
+    <div className="rounded border border-zinc-200 bg-white flex flex-col flex-1 min-h-0">
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
         {messages.length === 0 && (
           <div className="text-sm text-zinc-500">
