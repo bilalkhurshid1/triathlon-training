@@ -1,36 +1,71 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Training Coach
 
-## Getting Started
+> i signed up for a triathalon even though i'm an unatheltic fuck and i cant even swim. so i vibecoded this bullshit
 
-First, run the development server:
+Local-first triathlon training log and LLM coach. The app tracks workouts, race details, profile context, and coach chat history in a local SQLite database.
+
+would like to add it to snappify or vercel at some point
+
+## Stack
+
+- Next.js 16 App Router
+- React 19, TypeScript, Tailwind CSS 4
+- Prisma 7 with SQLite and `better-sqlite3`
+- AI SDK with Anthropic or OpenAI providers
+
+## Setup
 
 ```bash
+npm install
+cp .env.example .env
+npx prisma migrate dev
+npx prisma generate
+npx tsx prisma/seed.ts
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`.env.example` contains the expected local shape:
 
-## Learn More
+```bash
+DATABASE_URL="file:./dev.db"
+ANTHROPIC_API_KEY=
+OPENAI_API_KEY=
+```
 
-To learn more about Next.js, take a look at the following resources:
+`DATABASE_URL` defaults to local SQLite. Add the API key for the provider selected in `/settings`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Commands
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run dev     # start local dev server
+npm run build   # production build
+npm run start   # serve production build
+npm run lint    # run ESLint
+```
 
-## Deploy on Vercel
+Database helpers:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npx prisma migrate dev       # apply local migrations
+npx prisma generate          # generate Prisma client into src/generated/prisma
+npx tsx prisma/seed.ts       # seed local profile/settings/race data
+npx tsx scripts/import-diary.ts [path]  # import diary text, defaults to training-diary.txt
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## App Map
+
+- `/` dashboard and recent training summary
+- `/workouts` workout list and manual entry flow
+- `/coach` LLM coach chat
+- `/coach/debug` coach context/debug view
+- `/profile` athlete profile
+- `/race` primary race details
+- `/settings` model/provider settings
+
+## Notes
+
+Local runtime artifacts are ignored by git, including `.env`, `dev.db`, `.next`, and the generated Prisma client at `src/generated/prisma`.
