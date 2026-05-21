@@ -55,10 +55,19 @@ export async function POST(req: Request) {
     const userMsgCount = await prisma.chatMessage.count({
       where: { sessionId, role: "user" },
     });
+    const sessionData = { archivedAt: null as Date | null, updatedAt: new Date() };
     if (userMsgCount === 1) {
       await prisma.coachSession.update({
         where: { id: sessionId },
-        data: { title: userMsg.slice(0, 40).trim() || "New session" },
+        data: {
+          ...sessionData,
+          title: userMsg.slice(0, 40).trim() || "New session",
+        },
+      });
+    } else {
+      await prisma.coachSession.update({
+        where: { id: sessionId },
+        data: sessionData,
       });
     }
   }

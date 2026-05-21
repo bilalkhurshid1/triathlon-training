@@ -4,9 +4,9 @@ export const runtime = "nodejs";
 
 export async function GET() {
   const sessions = await prisma.coachSession.findMany({
-    where: { messages: { some: {} } },
+    where: { archivedAt: null, messages: { some: {} } },
     orderBy: { updatedAt: "desc" },
-    select: { id: true, title: true, updatedAt: true },
+    select: { id: true, title: true, updatedAt: true, archivedAt: true },
   });
   return Response.json(sessions);
 }

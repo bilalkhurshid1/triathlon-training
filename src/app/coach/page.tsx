@@ -23,11 +23,16 @@ export default async function CoachPage({
     redirect(`/coach?session=${s.id}`);
   }
 
-  const [sessions, dbMessages, settings] = await Promise.all([
+  const [sessions, archivedSessions, dbMessages, settings] = await Promise.all([
     prisma.coachSession.findMany({
-      where: { messages: { some: {} } },
+      where: { archivedAt: null, messages: { some: {} } },
       orderBy: { updatedAt: "desc" },
-      select: { id: true, title: true, updatedAt: true },
+      select: { id: true, title: true, updatedAt: true, archivedAt: true },
+    }),
+    prisma.coachSession.findMany({
+      where: { archivedAt: { not: null }, messages: { some: {} } },
+      orderBy: { archivedAt: "desc" },
+      select: { id: true, title: true, updatedAt: true, archivedAt: true },
     }),
     prisma.chatMessage.findMany({
       where: { sessionId },
@@ -49,6 +54,7 @@ export default async function CoachPage({
       <CoachLayout
         sessionId={sessionId}
         sessions={sessions}
+        archivedSessions={archivedSessions}
         initialMessages={initialMessages}
         settings={settings}
       />

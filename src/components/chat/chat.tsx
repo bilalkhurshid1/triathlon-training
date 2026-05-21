@@ -33,6 +33,12 @@ export function Chat({ sessionId, initialMessages }: Props) {
   const [input, setInput] = useState("");
   const isStreaming = status === "submitted" || status === "streaming";
 
+  function submitMessage() {
+    if (!input.trim() || isStreaming) return;
+    sendMessage({ text: input });
+    setInput("");
+  }
+
   return (
     <div className="rounded border border-zinc-200 bg-white flex flex-col flex-1 min-h-0">
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
@@ -49,7 +55,7 @@ export function Chat({ sessionId, initialMessages }: Props) {
           return (
             <div key={m.id} className="text-sm">
               <span className="text-xs uppercase tracking-wide text-zinc-500 block mb-0.5">
-                {m.role}
+                {m.role === "assistant" ? "Coach" : "You"}
               </span>
               {m.role === "assistant" ? (
                 <div className="prose prose-sm prose-zinc max-w-none">
@@ -73,16 +79,21 @@ export function Chat({ sessionId, initialMessages }: Props) {
         className="border-t border-zinc-200 p-2 flex gap-2"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!input.trim() || isStreaming) return;
-          sendMessage({ text: input });
-          setInput("");
+          submitMessage();
         }}
       >
-        <input
+        <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              submitMessage();
+            }
+          }}
           placeholder="ask the coach…"
-          className="flex-1 rounded border border-zinc-300 px-3 py-2 text-sm bg-white focus:outline-none focus:border-zinc-500"
+          rows={2}
+          className="max-h-32 min-h-10 flex-1 resize-none rounded border border-zinc-300 bg-white px-3 py-2 text-sm leading-5 focus:outline-none focus:border-zinc-500"
           disabled={isStreaming}
         />
         <button
