@@ -5,7 +5,7 @@ import type { LanguageModel } from "ai";
 
 export const PROVIDER_MODELS: Record<"anthropic" | "openai", string[]> = {
   anthropic: ["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5"],
-  openai: ["gpt-4o", "gpt-4o-mini", "gpt-4.1"],
+  openai: ["gpt-5.5", "gpt-5.4", "gpt-4o", "gpt-4o-mini", "gpt-4.1"],
 };
 
 export function getModel(settings: Pick<Settings, "provider" | "model">): LanguageModel {
