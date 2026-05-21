@@ -23,6 +23,10 @@
 # misc
 .DS_Store
 *.pem
+/dev.db
+/dev.db-journal
+/dev.db-wal
+/dev.db-shm
 
 # debug
 npm-debug.log*
