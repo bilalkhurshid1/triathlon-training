@@ -1,17 +1,19 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { daysUntil, isoDay } from "@/lib/dates";
-import { loadFlags, recentWorkouts, weeklyTotals } from "@/lib/coach/summaries";
+import { loadFlags, recentDailyHealth, recentWorkouts, weeklyTotals } from "@/lib/coach/summaries";
 
 export default async function DashboardPage() {
   const now = new Date();
-  const [race, weeks, recent, flags] = await Promise.all([
+  const [race, weeks, recent, health, flags] = await Promise.all([
     prisma.race.findFirst({ where: { isPrimary: true } }),
     weeklyTotals(4, now),
     recentWorkouts(7, now),
+    recentDailyHealth(7, now),
     loadFlags(now),
   ]);
   const thisWeek = weeks[weeks.length - 1];
+  const latestHealth = health[0];
 
   return (
     <div className="space-y-6">
@@ -54,6 +56,25 @@ export default async function DashboardPage() {
             <li>soreness trend: {flags.sorenessTrend}</li>
             <li>swim sessions (last 14d): {flags.swimSessionsLast14d}</li>
           </ul>
+        </Card>
+
+        <Card title="Garmin health">
+          {latestHealth ? (
+            <ul className="text-sm space-y-1">
+              <li>latest day: {latestHealth.date}</li>
+              <li>sleep: {latestHealth.sleepMin ?? "—"} min</li>
+              <li>resting HR: {latestHealth.restingHr != null ? Math.round(latestHealth.restingHr) : "—"} bpm</li>
+              <li>HRV: {latestHealth.hrvLastNightAvg != null ? Math.round(latestHealth.hrvLastNightAvg) : "—"} ms</li>
+              <li>stress: {latestHealth.stressAvg != null ? Math.round(latestHealth.stressAvg) : "—"}</li>
+              <li>
+                body battery: {latestHealth.bodyBatteryMin ?? "—"}-{latestHealth.bodyBatteryMax ?? "—"}
+              </li>
+            </ul>
+          ) : (
+            <p className="text-sm text-zinc-500">
+              No Garmin health data. <Link href="/integrations" className="underline">Sync Garmin</Link>.
+            </p>
+          )}
         </Card>
       </section>
 

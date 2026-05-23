@@ -59,6 +59,27 @@ export function contextToMarkdown(ctx: CoachContext): string {
   }
 
   out.push("");
+  out.push("## Last 14 days Garmin health (recent first)");
+  if (ctx.recentDailyHealth.length === 0) {
+    out.push("- (no Garmin health data imported in the last 14 days)");
+  } else {
+    for (const h of ctx.recentDailyHealth) {
+      const metric: string[] = [];
+      if (h.sleepMin != null) metric.push(`sleep ${h.sleepMin}m`);
+      if (h.restingHr != null) metric.push(`RHR ${Math.round(h.restingHr)}bpm`);
+      if (h.hrvLastNightAvg != null) metric.push(`HRV ${Math.round(h.hrvLastNightAvg)}ms`);
+      if (h.hrvStatus) metric.push(`HRV status ${h.hrvStatus}`);
+      if (h.stressAvg != null) metric.push(`stress ${Math.round(h.stressAvg)}`);
+      if (h.bodyBatteryMin != null || h.bodyBatteryMax != null) {
+        metric.push(`body battery ${h.bodyBatteryMin ?? "?"}-${h.bodyBatteryMax ?? "?"}`);
+      }
+      if (h.steps != null) metric.push(`steps ${h.steps}`);
+      if (h.intensityMin != null) metric.push(`intensity ${h.intensityMin}m`);
+      out.push(`- ${h.date}: ${metric.length ? metric.join(" · ") : "no metrics"}`);
+    }
+  }
+
+  out.push("");
   out.push("## Load flags");
   out.push(`- Consecutive hard days (RPE>=7): ${ctx.loadFlags.consecutiveHardDays}`);
   out.push(`- Days since last rest day: ${ctx.loadFlags.daysSinceRest}`);

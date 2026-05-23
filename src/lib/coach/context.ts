@@ -3,10 +3,12 @@ import { isoDay, daysUntil } from "@/lib/dates";
 import {
   loadFlags,
   milestones,
+  recentDailyHealth,
   recentWorkouts,
   weeklyTotals,
   type LoadFlags,
   type Milestone,
+  type RecentDailyHealth,
   type RecentWorkout,
   type WeeklyTotal,
 } from "@/lib/coach/summaries";
@@ -32,6 +34,7 @@ export type CoachContext = {
   };
   weeklyTotals: WeeklyTotal[];
   recentWorkouts: RecentWorkout[];
+  recentDailyHealth: RecentDailyHealth[];
   loadFlags: LoadFlags;
   milestones: Milestone[];
   userQuestion: string;
@@ -46,9 +49,10 @@ type BuildArgs = {
 
 export async function buildCoachContext(args: BuildArgs): Promise<CoachContext> {
   const now = args.now ?? new Date();
-  const [weeks, recent, flags, ms] = await Promise.all([
+  const [weeks, recent, health, flags, ms] = await Promise.all([
     weeklyTotals(4, now),
     recentWorkouts(14, now),
+    recentDailyHealth(14, now),
     loadFlags(now),
     milestones(),
   ]);
@@ -76,6 +80,7 @@ export async function buildCoachContext(args: BuildArgs): Promise<CoachContext> 
     },
     weeklyTotals: weeks,
     recentWorkouts: recent,
+    recentDailyHealth: health,
     loadFlags: flags,
     milestones: ms,
     userQuestion: args.userMsg,

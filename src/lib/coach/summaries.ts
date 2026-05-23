@@ -23,6 +23,22 @@ export type RecentWorkout = {
   notes: string | null;
 };
 
+export type RecentDailyHealth = {
+  date: string;
+  steps: number | null;
+  restingHr: number | null;
+  avgHr: number | null;
+  stressAvg: number | null;
+  sleepMin: number | null;
+  remSleepMin: number | null;
+  intensityMin: number | null;
+  bodyBatteryMin: number | null;
+  bodyBatteryMax: number | null;
+  hrvLastNightAvg: number | null;
+  hrvWeeklyAvg: number | null;
+  hrvStatus: string | null;
+};
+
 export type LoadFlags = {
   consecutiveHardDays: number;
   daysSinceRest: number;
@@ -112,6 +128,29 @@ export async function recentWorkouts(days = 14, now = new Date()): Promise<Recen
     rpe: w.rpe,
     soreness: w.soreness,
     notes: w.notes ? truncate(w.notes, 240) : null,
+  }));
+}
+
+export async function recentDailyHealth(days = 14, now = new Date()): Promise<RecentDailyHealth[]> {
+  const since = addDays(dayStart(now), -days + 1);
+  const rows = await prisma.dailyHealth.findMany({
+    where: { date: { gte: since } },
+    orderBy: { date: "desc" },
+  });
+  return rows.map((h) => ({
+    date: isoDay(new Date(h.date)),
+    steps: h.steps,
+    restingHr: h.restingHr,
+    avgHr: h.avgHr,
+    stressAvg: h.stressAvg,
+    sleepMin: h.sleepMin,
+    remSleepMin: h.remSleepMin,
+    intensityMin: h.intensityMin,
+    bodyBatteryMin: h.bodyBatteryMin,
+    bodyBatteryMax: h.bodyBatteryMax,
+    hrvLastNightAvg: h.hrvLastNightAvg,
+    hrvWeeklyAvg: h.hrvWeeklyAvg,
+    hrvStatus: h.hrvStatus,
   }));
 }
 

@@ -71,3 +71,7 @@ export const settingsFormSchema = z.object({
   model: z.string().min(1),
   systemPromptOverride: optionalString,
 });
+
+export const integrationConfigSchema = z.object({
+  sourcePath: optionalString,
+});

@@ -45,6 +45,7 @@ npm run dev     # start local dev server
 npm run build   # production build
 npm run start   # serve production build
 npm run lint    # run ESLint
+npm test         # run importer tests
 ```
 
 Database helpers:
@@ -64,6 +65,7 @@ npx tsx scripts/import-diary.ts [path]  # import diary text, defaults to trainin
 - `/coach/debug` coach context/debug view
 - `/profile` athlete profile
 - `/race` primary race details
+- `/integrations` local data imports, including GarminDB SQLite sync
 - `/settings` model/provider settings
 
 ## Notes

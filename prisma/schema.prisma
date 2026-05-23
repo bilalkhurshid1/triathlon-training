@@ -35,6 +35,40 @@ model Workout {
   @@index([type, date])
 }
 
+model DailyHealth {
+  id               String   @id @default(cuid())
+  date             DateTime
+  source           String   @default("manual")
+  steps            Int?
+  restingHr        Float?
+  avgHr            Float?
+  minHr            Float?
+  maxHr            Float?
+  stressAvg        Float?
+  sleepMin         Int?
+  remSleepMin      Int?
+  intensityMin     Int?
+  caloriesActive   Int?
+  caloriesBmr      Int?
+  bodyBatteryMin   Int?
+  bodyBatteryMax   Int?
+  spo2Avg          Float?
+  respirationAvg   Float?
+  hrvLastNightAvg  Float?
+  hrvWeeklyAvg     Float?
+  hrvStatus        String?
+  weight           Float?
+  weightUnit       String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  importRef ActivityImport? @relation(fields: [importId], references: [id])
+  importId  String?
+
+  @@unique([source, date])
+  @@index([date])
+}
+
 model WorkoutMetric {
   id        String  @id @default(cuid())
   workoutId String
@@ -110,6 +144,17 @@ model Settings {
   updatedAt            DateTime @updatedAt
 }
 
+model IntegrationConfig {
+  id              String    @id @default(cuid())
+  provider        String    @unique
+  sourcePath      String?
+  lastSyncAt      DateTime?
+  lastSyncStatus  String?
+  lastSyncMessage String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
 model ExternalAccount {
   id           String    @id @default(cuid())
   provider     String
@@ -138,4 +183,5 @@ model ActivityImport {
   createdAt   DateTime         @default(now())
 
   workouts Workout[]
+  dailyHealth DailyHealth[]
 }
