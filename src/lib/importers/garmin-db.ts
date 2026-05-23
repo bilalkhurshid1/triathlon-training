@@ -96,6 +96,7 @@ export type GarminImportResult = GarminDbReadResult & {
 };
 
 type GarminActivityRow = Record<string, unknown>;
+type GarminRecordRow = Record<string, unknown>;
 type GarminDailySummaryRow = Record<string, unknown>;
 type GarminHrvRow = Record<string, unknown>;
 
@@ -376,6 +377,7 @@ function readActivities(
   db: Database,
   measurementSystem: MeasurementSystem
 ): { workouts: ParsedGarminWorkout[]; skippedActivities: number } {
+  const recordMetricsByActivity = readRecordMetricsByActivity(db, measurementSystem);
   const rows = selectRows<GarminActivityRow>(
     db,
     "activities",
@@ -431,7 +433,10 @@ function readActivities(
     const type = mapGarminSport(sport, subSport, garminType, name);
     const distance = normalizeWorkoutDistance(asNumber(row.distance), type, measurementSystem);
     const elapsedSeconds = parseTimeToSeconds(row.elapsed_time) ?? elapsedSecondsFromRange(startTime, row.stop_time);
-    const metrics = activityMetrics(row);
+    const metrics = [
+      ...activityMetrics(row),
+      ...(recordMetricsByActivity.get(activityId) ?? []),
+    ];
 
     workouts.push({
       externalId: `garmin:${activityId}`,
@@ -447,6 +452,37 @@ function readActivities(
   }
 
   return { workouts, skippedActivities };
+}
+
+function readRecordMetricsByActivity(
+  db: Database,
+  measurementSystem: MeasurementSystem
+): Map<string, GarminMetricDraft[]> {
+  const out = new Map<string, GarminMetricDraft[]>();
+  if (!tableExists(db, "activity_records")) return out;
+
+  const rows = selectRows<GarminRecordRow>(
+    db,
+    "activity_records",
+    ["activity_id", "timestamp", "distance", "hr", "speed"],
+    "timestamp"
+  );
+
+  const byActivity = new Map<string, GarminRecordRow[]>();
+  for (const row of rows) {
+    const activityId = asString(row.activity_id);
+    if (!activityId) continue;
+    const group = byActivity.get(activityId) ?? [];
+    group.push(row);
+    byActivity.set(activityId, group);
+  }
+
+  for (const [activityId, records] of byActivity) {
+    const metrics = splitMetrics(records, measurementSystem);
+    if (metrics.length > 0) out.set(activityId, metrics);
+  }
+
+  return out;
 }
 
 function readDailyHealth(
@@ -588,6 +624,87 @@ function activityMetrics(row: GarminActivityRow): GarminMetricDraft[] {
     addNumberMetric(metrics, `hr_zone_${zone}_time_s`, parseTimeToSeconds(row[`hrz_${zone}_time`]), "s");
   }
   return metrics;
+}
+
+function splitMetrics(records: GarminRecordRow[], measurementSystem: MeasurementSystem): GarminMetricDraft[] {
+  const withTimestamps = records
+    .map((record) => ({
+      ts: parseDateTime(record.timestamp),
+      hr: asNumber(record.hr),
+      speed: asNumber(record.speed),
+      distance: asNumber(record.distance),
+    }))
+    .filter((record): record is { ts: Date; hr: number | null; speed: number | null; distance: number | null } =>
+      record.ts != null
+    )
+    .sort((a, b) => a.ts.getTime() - b.ts.getTime());
+
+  if (withTimestamps.length < 4) return [];
+
+  const firstTs = withTimestamps[0].ts.getTime();
+  const lastTs = withTimestamps[withTimestamps.length - 1].ts.getTime();
+  const durationMs = lastTs - firstTs;
+  if (durationMs <= 0) return [];
+
+  const midTs = firstTs + durationMs / 2;
+  let firstHalf = withTimestamps.filter((record) => record.ts.getTime() <= midTs);
+  let secondHalf = withTimestamps.filter((record) => record.ts.getTime() > midTs);
+  if (firstHalf.length === 0 || secondHalf.length === 0) {
+    const midpoint = Math.ceil(withTimestamps.length / 2);
+    firstHalf = withTimestamps.slice(0, midpoint);
+    secondHalf = withTimestamps.slice(midpoint);
+  }
+  if (firstHalf.length === 0 || secondHalf.length === 0) return [];
+
+  const first = halfStats(firstHalf);
+  const second = halfStats(secondHalf);
+  const speedUnit = measurementSystem === "metric" ? "km/h" : "mph";
+  const distanceUnit = measurementSystem === "metric" ? "km" : "mi";
+  const metrics: GarminMetricDraft[] = [];
+
+  addNumberMetric(metrics, "split_first_half_avg_speed", first.avgSpeed, speedUnit);
+  addNumberMetric(metrics, "split_second_half_avg_speed", second.avgSpeed, speedUnit);
+  addNumberMetric(metrics, "split_second_half_vs_first_speed_pct", percentChange(first.avgSpeed, second.avgSpeed), "%");
+  addNumberMetric(metrics, "split_first_half_avg_hr", first.avgHr, "bpm");
+  addNumberMetric(metrics, "split_second_half_avg_hr", second.avgHr, "bpm");
+  addNumberMetric(metrics, "split_second_half_vs_first_hr_bpm", subtract(second.avgHr, first.avgHr), "bpm");
+  addNumberMetric(metrics, "split_first_half_distance", first.distance, distanceUnit);
+  addNumberMetric(metrics, "split_second_half_distance", second.distance, distanceUnit);
+  addNumberMetric(metrics, "split_first_half_duration_s", first.durationSec, "s");
+  addNumberMetric(metrics, "split_second_half_duration_s", second.durationSec, "s");
+
+  return metrics;
+}
+
+function halfStats(records: Array<{ ts: Date; hr: number | null; speed: number | null; distance: number | null }>) {
+  return {
+    avgHr: average(records.map((record) => record.hr)),
+    avgSpeed: average(records.map((record) => record.speed)),
+    distance: cumulativeDistance(records.map((record) => record.distance)),
+    durationSec: Math.round((records[records.length - 1].ts.getTime() - records[0].ts.getTime()) / 1000),
+  };
+}
+
+function average(values: Array<number | null>): number | null {
+  const numeric = values.filter((value): value is number => value != null && Number.isFinite(value));
+  if (numeric.length === 0) return null;
+  return numeric.reduce((sum, value) => sum + value, 0) / numeric.length;
+}
+
+function cumulativeDistance(values: Array<number | null>): number | null {
+  const numeric = values.filter((value): value is number => value != null && Number.isFinite(value));
+  if (numeric.length < 2) return null;
+  const delta = Math.max(...numeric) - Math.min(...numeric);
+  return delta >= 0 ? delta : null;
+}
+
+function percentChange(first: number | null, second: number | null): number | null {
+  if (first == null || second == null || first === 0) return null;
+  return ((second - first) / first) * 100;
+}
+
+function subtract(a: number | null, b: number | null): number | null {
+  return a == null || b == null ? null : a - b;
 }
 
 function normalizeWorkoutDistance(

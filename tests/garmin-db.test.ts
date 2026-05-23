@@ -72,6 +72,14 @@ test("imports GarminDB workouts and health idempotently", async () => {
   assert.equal(runWorkout.distanceUnit, "mi");
   assert.equal(runWorkout.metrics.filter((metric) => metric.key === "avg_hr").length, 1);
   assert.equal(runWorkout.metrics.some((metric) => metric.key === "hr_zone_2_time_s"), true);
+  const splitSpeed = runWorkout.metrics.find(
+    (metric) => metric.key === "split_second_half_vs_first_speed_pct"
+  );
+  const splitHr = runWorkout.metrics.find(
+    (metric) => metric.key === "split_second_half_vs_first_hr_bpm"
+  );
+  assert.ok(splitSpeed?.valueNum != null && splitSpeed.valueNum < -20);
+  assert.ok(splitHr?.valueNum != null && splitHr.valueNum > 10);
 
   const swimWorkout = workouts.find((workout) => workout.externalId === "garmin:67890");
   assert.ok(swimWorkout);
@@ -274,6 +282,21 @@ function createGarminFixture(sourceDir: string) {
         1.6, 0, 'good', 'easy', '00:08:00', '00:12:00',
         '00:06:00', '00:03:00', '00:01:00'
       );
+
+      CREATE TABLE "activity_records" (
+        "activity_id" TEXT,
+        "record" INTEGER,
+        "timestamp" DATETIME,
+        "distance" REAL,
+        "hr" INTEGER,
+        "speed" REAL
+      );
+      INSERT INTO "activity_records" ("activity_id", "record", "timestamp", "distance", "hr", "speed")
+      VALUES
+        ('12345', 1, '2026-05-20 06:15:00', 0.0, 138, 7.4),
+        ('12345', 2, '2026-05-20 06:25:00', 1.3, 144, 7.1),
+        ('12345', 3, '2026-05-20 06:45:00', 3.0, 156, 5.0),
+        ('12345', 4, '2026-05-20 06:57:30', 4.2, 162, 4.9);
     `);
   } finally {
     activitiesDb.close();
