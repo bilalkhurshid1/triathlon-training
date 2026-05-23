@@ -46,14 +46,14 @@ test("imports GarminDB workouts and health idempotently", async () => {
   });
 
   const first = await importGarminDb(sourceDir);
-  assert.equal(first.workoutsCreated, 1);
+  assert.equal(first.workoutsCreated, 2);
   assert.equal(first.workoutsUpdated, 0);
   assert.equal(first.healthCreated, 1);
   assert.equal(first.healthUpdated, 0);
 
   const second = await importGarminDb(sourceDir);
   assert.equal(second.workoutsCreated, 0);
-  assert.equal(second.workoutsUpdated, 1);
+  assert.equal(second.workoutsUpdated, 2);
   assert.equal(second.healthCreated, 0);
   assert.equal(second.healthUpdated, 1);
 
@@ -61,24 +61,28 @@ test("imports GarminDB workouts and health idempotently", async () => {
     include: { metrics: true },
     orderBy: [{ source: "asc" }, { date: "asc" }],
   });
-  assert.equal(workouts.length, 2);
+  assert.equal(workouts.length, 3);
   assert.equal(workouts.filter((workout) => workout.source === "manual").length, 1);
 
-  const garminWorkout = workouts.find((workout) => workout.source === "garmin");
-  assert.ok(garminWorkout);
-  assert.equal(garminWorkout.externalId, "garmin:12345");
-  assert.equal(garminWorkout.type, "run");
-  assert.equal(garminWorkout.durationMin, 43);
-  assert.equal(garminWorkout.distance, 4.2);
-  assert.equal(garminWorkout.distanceUnit, "mi");
-  assert.equal(garminWorkout.metrics.filter((metric) => metric.key === "avg_hr").length, 1);
-  assert.equal(garminWorkout.metrics.some((metric) => metric.key === "hr_zone_2_time_s"), true);
+  const runWorkout = workouts.find((workout) => workout.externalId === "garmin:12345");
+  assert.ok(runWorkout);
+  assert.equal(runWorkout.type, "run");
+  assert.equal(runWorkout.durationMin, 43);
+  assert.equal(runWorkout.distance, 4.2);
+  assert.equal(runWorkout.distanceUnit, "mi");
+  assert.equal(runWorkout.metrics.filter((metric) => metric.key === "avg_hr").length, 1);
+  assert.equal(runWorkout.metrics.some((metric) => metric.key === "hr_zone_2_time_s"), true);
+
+  const swimWorkout = workouts.find((workout) => workout.externalId === "garmin:67890");
+  assert.ok(swimWorkout);
+  assert.equal(swimWorkout.type, "swim");
+  assert.equal(swimWorkout.distance, 480);
+  assert.equal(swimWorkout.distanceUnit, "yd");
 
   const healthRows = await prisma.dailyHealth.findMany();
   assert.equal(healthRows.length, 1);
   assert.equal(healthRows[0].source, "garmin");
   assert.equal(healthRows[0].steps, 8421);
-  assert.equal(healthRows[0].sleepMin, 450);
   assert.equal(healthRows[0].hrvLastNightAvg, 44);
   assert.equal(healthRows[0].hrvStatus, "balanced");
 });
@@ -134,8 +138,6 @@ function createAppSchema(filename: string) {
         "minHr" REAL,
         "maxHr" REAL,
         "stressAvg" REAL,
-        "sleepMin" INTEGER,
-        "remSleepMin" INTEGER,
         "intensityMin" INTEGER,
         "caloriesActive" INTEGER,
         "caloriesBmr" INTEGER,
@@ -256,6 +258,22 @@ function createGarminFixture(sourceDir: string) {
         3.1, 0.8, 'good', 'moderate', '00:05:00', '00:12:00',
         '00:15:00', '00:08:00', '00:02:30'
       );
+      INSERT INTO "activities" (
+        "activity_id", "name", "description", "type", "sport", "sub_sport",
+        "start_time", "stop_time", "elapsed_time", "moving_time", "distance",
+        "avg_hr", "max_hr", "calories", "avg_cadence", "max_cadence",
+        "avg_speed", "max_speed", "ascent", "descent", "training_load",
+        "training_effect", "anaerobic_training_effect", "self_eval_feel",
+        "self_eval_effort", "hrz_1_time", "hrz_2_time", "hrz_3_time",
+        "hrz_4_time", "hrz_5_time"
+      )
+      VALUES (
+        '67890', 'Pool Swim', 'form work', 'fitness', 'swimming', 'lap_swimming',
+        '2026-05-20 18:00:00', '2026-05-20 18:30:00', '00:30:00', '00:28:00', 0.2727272727,
+        118, 140, 180, NULL, NULL, 0.55, 0.8, NULL, NULL, 12,
+        1.6, 0, 'good', 'easy', '00:08:00', '00:12:00',
+        '00:06:00', '00:03:00', '00:01:00'
+      );
     `);
   } finally {
     activitiesDb.close();
@@ -272,8 +290,6 @@ function createGarminFixture(sourceDir: string) {
         "rhr_avg" REAL,
         "stress_avg" REAL,
         "steps" INTEGER,
-        "sleep_avg" TIME,
-        "rem_sleep_avg" TIME,
         "intensity_time" TIME,
         "calories_active_avg" INTEGER,
         "calories_bmr_avg" INTEGER,
@@ -285,13 +301,13 @@ function createGarminFixture(sourceDir: string) {
       );
       INSERT INTO "days_summary" (
         "day", "hr_avg", "hr_min", "hr_max", "rhr_avg", "stress_avg",
-        "steps", "sleep_avg", "rem_sleep_avg", "intensity_time",
+        "steps", "intensity_time",
         "calories_active_avg", "calories_bmr_avg", "spo2_avg",
         "rr_waking_avg", "bb_min", "bb_max", "weight_avg"
       )
       VALUES (
         '2026-05-20 00:00:00', 72, 44, 168, 49, 31,
-        8421, '07:30:00', '01:15:00', '00:42:00',
+        8421, '00:42:00',
         650, 1800, 97, 14.4, 32, 88, 182.4
       );
     `);

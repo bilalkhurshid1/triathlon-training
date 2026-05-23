@@ -62,7 +62,6 @@ export default async function DashboardPage() {
           {latestHealth ? (
             <ul className="text-sm space-y-1">
               <li>latest day: {latestHealth.date}</li>
-              <li>sleep: {latestHealth.sleepMin ?? "—"} min</li>
               <li>resting HR: {latestHealth.restingHr != null ? Math.round(latestHealth.restingHr) : "—"} bpm</li>
               <li>HRV: {latestHealth.hrvLastNightAvg != null ? Math.round(latestHealth.hrvLastNightAvg) : "—"} ms</li>
               <li>stress: {latestHealth.stressAvg != null ? Math.round(latestHealth.stressAvg) : "—"}</li>

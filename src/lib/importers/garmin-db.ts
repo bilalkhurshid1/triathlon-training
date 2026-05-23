@@ -65,8 +65,6 @@ export type ParsedGarminDailyHealth = {
   minHr: number | null;
   maxHr: number | null;
   stressAvg: number | null;
-  sleepMin: number | null;
-  remSleepMin: number | null;
   intensityMin: number | null;
   caloriesActive: number | null;
   caloriesBmr: number | null;
@@ -430,19 +428,19 @@ function readActivities(
     const subSport = asString(row.sub_sport);
     const garminType = asString(row.type);
     const name = asString(row.name);
-    const distance = asNumber(row.distance);
-    const distanceUnit = distance == null ? null : measurementSystem === "metric" ? "km" : "mi";
+    const type = mapGarminSport(sport, subSport, garminType, name);
+    const distance = normalizeWorkoutDistance(asNumber(row.distance), type, measurementSystem);
     const elapsedSeconds = parseTimeToSeconds(row.elapsed_time) ?? elapsedSecondsFromRange(startTime, row.stop_time);
     const metrics = activityMetrics(row);
 
     workouts.push({
       externalId: `garmin:${activityId}`,
       date: startTime,
-      type: mapGarminSport(sport, subSport, garminType, name),
+      type,
       title: name ?? titleFromGarminSport(sport, subSport, garminType),
       durationMin: elapsedSeconds == null ? null : Math.round(elapsedSeconds / 60),
-      distance,
-      distanceUnit,
+      distance: distance?.value ?? null,
+      distanceUnit: distance?.unit ?? null,
       notes: asString(row.description),
       metrics,
     });
@@ -467,8 +465,6 @@ function readDailyHealth(
       "rhr_avg",
       "stress_avg",
       "steps",
-      "sleep_avg",
-      "rem_sleep_avg",
       "intensity_time",
       "calories_active_avg",
       "calories_bmr_avg",
@@ -494,8 +490,6 @@ function readDailyHealth(
       minHr: asNumber(row.hr_min),
       maxHr: asNumber(row.hr_max),
       stressAvg: asNumber(row.stress_avg),
-      sleepMin: secondsToMinutes(parseTimeToSeconds(row.sleep_avg)),
-      remSleepMin: secondsToMinutes(parseTimeToSeconds(row.rem_sleep_avg)),
       intensityMin: secondsToMinutes(parseTimeToSeconds(row.intensity_time)),
       caloriesActive: asInteger(row.calories_active_avg),
       caloriesBmr: asInteger(row.calories_bmr_avg),
@@ -594,6 +588,27 @@ function activityMetrics(row: GarminActivityRow): GarminMetricDraft[] {
     addNumberMetric(metrics, `hr_zone_${zone}_time_s`, parseTimeToSeconds(row[`hrz_${zone}_time`]), "s");
   }
   return metrics;
+}
+
+function normalizeWorkoutDistance(
+  distance: number | null,
+  type: string,
+  measurementSystem: MeasurementSystem
+): { value: number; unit: string } | null {
+  if (distance == null) return null;
+  if (type === "swim") {
+    return measurementSystem === "metric"
+      ? { value: roundDistance(distance * 1000), unit: "m" }
+      : { value: Math.round(distance * 1760), unit: "yd" };
+  }
+  return {
+    value: roundDistance(distance),
+    unit: measurementSystem === "metric" ? "km" : "mi",
+  };
+}
+
+function roundDistance(distance: number): number {
+  return Math.round(distance * 100) / 100;
 }
 
 function addTextMetric(metrics: GarminMetricDraft[], key: string, value: unknown): void {

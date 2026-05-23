@@ -65,7 +65,6 @@ export function contextToMarkdown(ctx: CoachContext): string {
   } else {
     for (const h of ctx.recentDailyHealth) {
       const metric: string[] = [];
-      if (h.sleepMin != null) metric.push(`sleep ${h.sleepMin}m`);
       if (h.restingHr != null) metric.push(`RHR ${Math.round(h.restingHr)}bpm`);
       if (h.hrvLastNightAvg != null) metric.push(`HRV ${Math.round(h.hrvLastNightAvg)}ms`);
       if (h.hrvStatus) metric.push(`HRV status ${h.hrvStatus}`);

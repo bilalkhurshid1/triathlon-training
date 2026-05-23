@@ -29,8 +29,6 @@ export type RecentDailyHealth = {
   restingHr: number | null;
   avgHr: number | null;
   stressAvg: number | null;
-  sleepMin: number | null;
-  remSleepMin: number | null;
   intensityMin: number | null;
   bodyBatteryMin: number | null;
   bodyBatteryMax: number | null;
@@ -143,8 +141,6 @@ export async function recentDailyHealth(days = 14, now = new Date()): Promise<Re
     restingHr: h.restingHr,
     avgHr: h.avgHr,
     stressAvg: h.stressAvg,
-    sleepMin: h.sleepMin,
-    remSleepMin: h.remSleepMin,
     intensityMin: h.intensityMin,
     bodyBatteryMin: h.bodyBatteryMin,
     bodyBatteryMax: h.bodyBatteryMax,

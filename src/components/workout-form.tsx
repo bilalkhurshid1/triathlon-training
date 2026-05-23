@@ -17,7 +17,7 @@ type Props = {
     | "notes"
   >;
   submitLabel?: string;
-  deleteAction?: () => void | Promise<void>;
+  deleteAction?: (formData: FormData) => void | Promise<void>;
 };
 
 const labelCls = "text-xs uppercase tracking-wide text-zinc-500";
@@ -139,14 +139,14 @@ export function WorkoutForm({ action, workout, submitLabel = "Save", deleteActio
           {submitLabel}
         </button>
         {deleteAction && (
-          <form action={deleteAction}>
-            <button
-              type="submit"
-              className="rounded border border-red-300 px-3 py-2 text-sm text-red-700 hover:bg-red-50"
-            >
-              Delete
-            </button>
-          </form>
+          <button
+            type="submit"
+            formAction={deleteAction}
+            formNoValidate
+            className="rounded border border-red-300 px-3 py-2 text-sm text-red-700 hover:bg-red-50"
+          >
+            Delete
+          </button>
         )}
       </div>
     </form>

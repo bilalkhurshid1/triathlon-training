@@ -45,8 +45,6 @@ model DailyHealth {
   minHr            Float?
   maxHr            Float?
   stressAvg        Float?
-  sleepMin         Int?
-  remSleepMin      Int?
   intensityMin     Int?
   caloriesActive   Int?
   caloriesBmr      Int?
