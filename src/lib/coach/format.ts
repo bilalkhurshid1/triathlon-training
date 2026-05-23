@@ -53,7 +53,7 @@ export function contextToMarkdown(ctx: CoachContext): string {
       if (r.rpe != null) metric.push(`RPE ${r.rpe}`);
       if (r.soreness != null) metric.push(`soreness ${r.soreness}`);
       if (metric.length) seg.push(metric.join(", "));
-      if (r.garminSplit) seg.push(`Garmin split: ${r.garminSplit}`);
+      if (r.garminTimeline) seg.push(`Garmin timeline: ${r.garminTimeline}`);
       if (r.notes) seg.push(`notes: ${line(r.notes)}`);
       out.push(`- ${seg.join(" — ")}`);
     }

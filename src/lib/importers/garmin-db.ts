@@ -478,7 +478,7 @@ function readRecordMetricsByActivity(
   }
 
   for (const [activityId, records] of byActivity) {
-    const metrics = splitMetrics(records, measurementSystem);
+    const metrics = timelineMetrics(records, measurementSystem);
     if (metrics.length > 0) out.set(activityId, metrics);
   }
 
@@ -626,7 +626,7 @@ function activityMetrics(row: GarminActivityRow): GarminMetricDraft[] {
   return metrics;
 }
 
-function splitMetrics(records: GarminRecordRow[], measurementSystem: MeasurementSystem): GarminMetricDraft[] {
+function timelineMetrics(records: GarminRecordRow[], measurementSystem: MeasurementSystem): GarminMetricDraft[] {
   const withTimestamps = records
     .map((record) => ({
       ts: parseDateTime(record.timestamp),
@@ -646,43 +646,41 @@ function splitMetrics(records: GarminRecordRow[], measurementSystem: Measurement
   const durationMs = lastTs - firstTs;
   if (durationMs <= 0) return [];
 
-  const midTs = firstTs + durationMs / 2;
-  let firstHalf = withTimestamps.filter((record) => record.ts.getTime() <= midTs);
-  let secondHalf = withTimestamps.filter((record) => record.ts.getTime() > midTs);
-  if (firstHalf.length === 0 || secondHalf.length === 0) {
-    const midpoint = Math.ceil(withTimestamps.length / 2);
-    firstHalf = withTimestamps.slice(0, midpoint);
-    secondHalf = withTimestamps.slice(midpoint);
+  const segmentCount = Math.min(8, Math.max(4, Math.floor(withTimestamps.length / 3)));
+  const groups = Array.from({ length: segmentCount }, () => [] as typeof withTimestamps);
+  for (const record of withTimestamps) {
+    const pct = (record.ts.getTime() - firstTs) / durationMs;
+    const index = Math.min(segmentCount - 1, Math.floor(pct * segmentCount));
+    groups[index].push(record);
   }
-  if (firstHalf.length === 0 || secondHalf.length === 0) return [];
 
-  const first = halfStats(firstHalf);
-  const second = halfStats(secondHalf);
   const speedUnit = measurementSystem === "metric" ? "km/h" : "mph";
   const distanceUnit = measurementSystem === "metric" ? "km" : "mi";
-  const metrics: GarminMetricDraft[] = [];
+  const segments = groups
+    .map((group, index) => {
+      if (group.length === 0) return null;
+      return {
+        fromPct: Math.round((index / segmentCount) * 100),
+        toPct: Math.round(((index + 1) / segmentCount) * 100),
+        durationSec: Math.round(durationMs / segmentCount / 1000),
+        distance: roundNullable(cumulativeDistance(group.map((record) => record.distance))),
+        avgSpeed: roundNullable(average(group.map((record) => record.speed))),
+        avgHr: roundNullable(average(group.map((record) => record.hr))),
+      };
+    })
+    .filter((segment): segment is NonNullable<typeof segment> => segment != null);
 
-  addNumberMetric(metrics, "split_first_half_avg_speed", first.avgSpeed, speedUnit);
-  addNumberMetric(metrics, "split_second_half_avg_speed", second.avgSpeed, speedUnit);
-  addNumberMetric(metrics, "split_second_half_vs_first_speed_pct", percentChange(first.avgSpeed, second.avgSpeed), "%");
-  addNumberMetric(metrics, "split_first_half_avg_hr", first.avgHr, "bpm");
-  addNumberMetric(metrics, "split_second_half_avg_hr", second.avgHr, "bpm");
-  addNumberMetric(metrics, "split_second_half_vs_first_hr_bpm", subtract(second.avgHr, first.avgHr), "bpm");
-  addNumberMetric(metrics, "split_first_half_distance", first.distance, distanceUnit);
-  addNumberMetric(metrics, "split_second_half_distance", second.distance, distanceUnit);
-  addNumberMetric(metrics, "split_first_half_duration_s", first.durationSec, "s");
-  addNumberMetric(metrics, "split_second_half_duration_s", second.durationSec, "s");
+  if (segments.length === 0) return [];
 
-  return metrics;
-}
-
-function halfStats(records: Array<{ ts: Date; hr: number | null; speed: number | null; distance: number | null }>) {
-  return {
-    avgHr: average(records.map((record) => record.hr)),
-    avgSpeed: average(records.map((record) => record.speed)),
-    distance: cumulativeDistance(records.map((record) => record.distance)),
-    durationSec: Math.round((records[records.length - 1].ts.getTime() - records[0].ts.getTime()) / 1000),
-  };
+  return [
+    {
+      key: "record_timeline",
+      valueText: JSON.stringify({
+        units: { speed: speedUnit, distance: distanceUnit, hr: "bpm" },
+        segments,
+      }),
+    },
+  ];
 }
 
 function average(values: Array<number | null>): number | null {
@@ -698,13 +696,8 @@ function cumulativeDistance(values: Array<number | null>): number | null {
   return delta >= 0 ? delta : null;
 }
 
-function percentChange(first: number | null, second: number | null): number | null {
-  if (first == null || second == null || first === 0) return null;
-  return ((second - first) / first) * 100;
-}
-
-function subtract(a: number | null, b: number | null): number | null {
-  return a == null || b == null ? null : a - b;
+function roundNullable(value: number | null): number | null {
+  return value == null ? null : Math.round(value * 10) / 10;
 }
 
 function normalizeWorkoutDistance(

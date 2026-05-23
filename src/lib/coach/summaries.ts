@@ -22,7 +22,7 @@ export type RecentWorkout = {
   rpe: number | null;
   soreness: number | null;
   notes: string | null;
-  garminSplit: string | null;
+  garminTimeline: string | null;
 };
 
 export type RecentDailyHealth = {
@@ -121,12 +121,7 @@ export async function recentWorkouts(days = 14, now = new Date()): Promise<Recen
         where: {
           key: {
             in: [
-              "split_first_half_avg_speed",
-              "split_second_half_avg_speed",
-              "split_second_half_vs_first_speed_pct",
-              "split_first_half_avg_hr",
-              "split_second_half_avg_hr",
-              "split_second_half_vs_first_hr_bpm",
+              "record_timeline",
             ],
           },
         },
@@ -145,41 +140,40 @@ export async function recentWorkouts(days = 14, now = new Date()): Promise<Recen
     rpe: w.rpe,
     soreness: w.soreness,
     notes: w.notes ? truncate(w.notes, 240) : null,
-    garminSplit: formatGarminSplit(w.metrics),
+    garminTimeline: formatGarminTimeline(w.metrics),
   }));
 }
 
-function formatGarminSplit(metrics: Array<{ key: string; valueNum: number | null; unit: string | null }>): string | null {
-  if (metrics.length === 0) return null;
-  const byKey = new Map(metrics.map((metric) => [metric.key, metric]));
-  const firstSpeed = byKey.get("split_first_half_avg_speed");
-  const secondSpeed = byKey.get("split_second_half_avg_speed");
-  const speedPct = byKey.get("split_second_half_vs_first_speed_pct")?.valueNum;
-  const firstHr = byKey.get("split_first_half_avg_hr")?.valueNum;
-  const secondHr = byKey.get("split_second_half_avg_hr")?.valueNum;
-  const hrDelta = byKey.get("split_second_half_vs_first_hr_bpm")?.valueNum;
-  const parts: string[] = [];
+function formatGarminTimeline(metrics: Array<{ key: string; valueText: string | null }>): string | null {
+  const raw = metrics.find((metric) => metric.key === "record_timeline")?.valueText;
+  if (!raw) return null;
 
-  if (firstSpeed?.valueNum != null && secondSpeed?.valueNum != null) {
-    const speedUnit = firstSpeed.unit ?? "";
-    const speedChange =
-      speedPct == null
-        ? ""
-        : `, second half ${Math.abs(Math.round(speedPct))}% ${speedPct < 0 ? "slower" : "faster"}`;
-    parts.push(
-      `speed ${round1(firstSpeed.valueNum)}->${round1(secondSpeed.valueNum)} ${speedUnit}${speedChange}`
-    );
+  try {
+    const parsed = JSON.parse(raw) as {
+      units?: { speed?: string; distance?: string; hr?: string };
+      segments?: Array<{
+        fromPct: number;
+        toPct: number;
+        distance: number | null;
+        avgSpeed: number | null;
+        avgHr: number | null;
+      }>;
+    };
+    const segments = parsed.segments ?? [];
+    if (segments.length === 0) return null;
+    const speedUnit = parsed.units?.speed ?? "";
+    const distanceUnit = parsed.units?.distance ?? "";
+    const formatted = segments.map((segment) => {
+      const values: string[] = [];
+      if (segment.distance != null) values.push(`${segment.distance}${distanceUnit}`);
+      if (segment.avgSpeed != null) values.push(`${segment.avgSpeed}${speedUnit}`);
+      if (segment.avgHr != null) values.push(`HR ${Math.round(segment.avgHr)}`);
+      return `${segment.fromPct}-${segment.toPct}% ${values.join(", ")}`;
+    });
+    return formatted.join("; ");
+  } catch {
+    return null;
   }
-  if (firstHr != null && secondHr != null) {
-    const deltaText = hrDelta == null ? "" : `, ${hrDelta >= 0 ? "+" : ""}${Math.round(hrDelta)} bpm`;
-    parts.push(`HR ${Math.round(firstHr)}->${Math.round(secondHr)} bpm${deltaText}`);
-  }
-
-  return parts.length > 0 ? parts.join("; ") : null;
-}
-
-function round1(value: number): number {
-  return Math.round(value * 10) / 10;
 }
 
 export async function recentDailyHealth(days = 14, now = new Date()): Promise<RecentDailyHealth[]> {
@@ -187,6 +181,19 @@ export async function recentDailyHealth(days = 14, now = new Date()): Promise<Re
   const rows = await prisma.dailyHealth.findMany({
     where: { date: { gte: since } },
     orderBy: { date: "desc" },
+    select: {
+      date: true,
+      steps: true,
+      restingHr: true,
+      avgHr: true,
+      stressAvg: true,
+      intensityMin: true,
+      bodyBatteryMin: true,
+      bodyBatteryMax: true,
+      hrvLastNightAvg: true,
+      hrvWeeklyAvg: true,
+      hrvStatus: true,
+    },
   });
   return rows.map((h) => ({
     date: isoDay(new Date(h.date)),

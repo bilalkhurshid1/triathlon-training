@@ -72,14 +72,18 @@ test("imports GarminDB workouts and health idempotently", async () => {
   assert.equal(runWorkout.distanceUnit, "mi");
   assert.equal(runWorkout.metrics.filter((metric) => metric.key === "avg_hr").length, 1);
   assert.equal(runWorkout.metrics.some((metric) => metric.key === "hr_zone_2_time_s"), true);
-  const splitSpeed = runWorkout.metrics.find(
-    (metric) => metric.key === "split_second_half_vs_first_speed_pct"
-  );
-  const splitHr = runWorkout.metrics.find(
-    (metric) => metric.key === "split_second_half_vs_first_hr_bpm"
-  );
-  assert.ok(splitSpeed?.valueNum != null && splitSpeed.valueNum < -20);
-  assert.ok(splitHr?.valueNum != null && splitHr.valueNum > 10);
+  const timeline = runWorkout.metrics.find((metric) => metric.key === "record_timeline");
+  assert.ok(timeline?.valueText);
+  const parsedTimeline = JSON.parse(timeline.valueText) as {
+    units: { speed: string; distance: string };
+    segments: Array<{ fromPct: number; toPct: number; avgSpeed: number | null; avgHr: number | null }>;
+  };
+  assert.equal(parsedTimeline.units.speed, "mph");
+  assert.ok(parsedTimeline.segments.length >= 3);
+  assert.equal(parsedTimeline.segments[0].fromPct, 0);
+  assert.equal(parsedTimeline.segments.at(-1)?.toPct, 100);
+  assert.ok((parsedTimeline.segments[0].avgSpeed ?? 0) > (parsedTimeline.segments.at(-1)?.avgSpeed ?? 0));
+  assert.ok((parsedTimeline.segments.at(-1)?.avgHr ?? 0) > (parsedTimeline.segments[0].avgHr ?? 0));
 
   const swimWorkout = workouts.find((workout) => workout.externalId === "garmin:67890");
   assert.ok(swimWorkout);
