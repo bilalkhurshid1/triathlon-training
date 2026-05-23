@@ -12,6 +12,7 @@ export type WeeklyTotal = {
 };
 
 export type RecentWorkout = {
+  id: string;
   date: string;
   type: string;
   title: string | null;
@@ -130,6 +131,7 @@ export async function recentWorkouts(days = 14, now = new Date()): Promise<Recen
     orderBy: { date: "desc" },
   });
   return rows.map((w) => ({
+    id: w.id,
     date: isoDay(new Date(w.date)),
     type: w.type,
     title: w.title,

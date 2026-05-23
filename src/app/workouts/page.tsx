@@ -69,10 +69,18 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Sea
               </tr>
             )}
             {workouts.map((w) => (
-              <tr key={w.id} className="border-t border-zinc-100">
-                <td className="px-3 py-2 whitespace-nowrap">{isoDay(new Date(w.date))}</td>
+              <tr key={w.id} className="border-t border-zinc-100 hover:bg-zinc-50">
+                <td className="px-3 py-2 whitespace-nowrap">
+                  <Link href={`/workouts/${w.id}`} className="font-mono text-zinc-700 hover:text-zinc-950">
+                    {isoDay(new Date(w.date))}
+                  </Link>
+                </td>
                 <td className="px-3 py-2">{w.type}</td>
-                <td className="px-3 py-2">{w.title ?? "—"}</td>
+                <td className="px-3 py-2">
+                  <Link href={`/workouts/${w.id}`} className="font-medium text-zinc-900 hover:underline">
+                    {w.title ?? "Untitled workout"}
+                  </Link>
+                </td>
                 <td className="px-3 py-2 whitespace-nowrap">
                   {w.distance != null ? `${w.distance} ${w.distanceUnit ?? ""}` : "—"}
                 </td>
@@ -80,7 +88,13 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Sea
                   {w.durationMin != null ? `${w.durationMin}m` : "—"}
                 </td>
                 <td className="px-3 py-2">{w.rpe ?? "—"}</td>
-                <td className="px-3 py-2">
+                <td className="px-3 py-2 space-x-3">
+                  <Link
+                    href={`/workouts/${w.id}`}
+                    className="text-zinc-600 hover:text-zinc-900 underline"
+                  >
+                    view
+                  </Link>
                   <Link
                     href={`/workouts/${w.id}/edit`}
                     className="text-zinc-600 hover:text-zinc-900 underline"

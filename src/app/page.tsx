@@ -86,8 +86,14 @@ export default async function DashboardPage() {
               {recent.map((r, i) => (
                 <li key={i} className="py-1.5">
                   <span className="font-mono text-zinc-500 mr-2">{r.date}</span>
-                  <span className="font-medium mr-2">{r.type}</span>
-                  {r.title && <span className="text-zinc-700">{r.title}</span>}
+                  <Link href={`/workouts/${r.id}`} className="font-medium mr-2 hover:underline">
+                    {r.type}
+                  </Link>
+                  {r.title && (
+                    <Link href={`/workouts/${r.id}`} className="text-zinc-700 hover:underline">
+                      {r.title}
+                    </Link>
+                  )}
                   <span className="ml-2 text-zinc-500">
                     {r.distance != null ? `${r.distance}${r.distanceUnit ?? ""} ` : ""}
                     {r.durationMin != null ? `${r.durationMin}m ` : ""}
