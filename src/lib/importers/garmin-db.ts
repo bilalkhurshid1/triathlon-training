@@ -23,6 +23,7 @@ export type GarminFileStatus = {
   name: RequiredGarminDbFile;
   path: string;
   exists: boolean;
+  modifiedAt: Date | null;
 };
 
 export type GarminIntegrationStatus = {
@@ -35,6 +36,7 @@ export type GarminIntegrationStatus = {
   sourcePath: string;
   expandedSourcePath: string;
   files: GarminFileStatus[];
+  latestSourceModifiedAt: Date | null;
   ready: boolean;
 };
 
@@ -118,7 +120,12 @@ export function getGarminRequiredFileStatuses(sourcePath: string | null | undefi
   const sourceDir = expandGarminDbPath(sourcePath);
   return REQUIRED_GARMIN_DB_FILES.map((name) => {
     const filePath = path.join(/* turbopackIgnore: true */ sourceDir, name);
-    return { name, path: filePath, exists: fs.existsSync(/* turbopackIgnore: true */ filePath) };
+    try {
+      const stat = fs.statSync(/* turbopackIgnore: true */ filePath);
+      return { name, path: filePath, exists: true, modifiedAt: stat.mtime };
+    } catch {
+      return { name, path: filePath, exists: false, modifiedAt: null };
+    }
   });
 }
 
@@ -141,8 +148,14 @@ export async function getGarminIntegrationStatus(): Promise<GarminIntegrationSta
     sourcePath,
     expandedSourcePath,
     files,
+    latestSourceModifiedAt: latestModifiedAt(files),
     ready: files.every((file) => file.exists),
   };
+}
+
+function latestModifiedAt(files: GarminFileStatus[]): Date | null {
+  const latestMs = Math.max(...files.map((file) => file.modifiedAt?.getTime() ?? Number.NEGATIVE_INFINITY));
+  return Number.isFinite(latestMs) ? new Date(latestMs) : null;
 }
 
 export async function updateGarminSourcePath(sourcePath: string | null): Promise<void> {

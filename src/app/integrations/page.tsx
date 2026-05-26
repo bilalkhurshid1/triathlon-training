@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import {
   getGarminIntegrationStatus,
   DEFAULT_GARMIN_DB_DIR,
@@ -8,10 +9,14 @@ import {
 } from "@/app/actions/integrations";
 
 export default async function IntegrationsPage() {
+  await connection();
   const status = await getGarminIntegrationStatus();
   const lastSyncLabel = status.config?.lastSyncAt
     ? status.config.lastSyncAt.toLocaleString()
     : "Never";
+  const sourceModifiedLabel = status.latestSourceModifiedAt
+    ? status.latestSourceModifiedAt.toLocaleString()
+    : "n/a";
 
   return (
     <div className="space-y-5">
@@ -55,6 +60,7 @@ export default async function IntegrationsPage() {
                 <tr>
                   <th className="px-3 py-2">File</th>
                   <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Modified</th>
                   <th className="px-3 py-2">Path</th>
                 </tr>
               </thead>
@@ -63,6 +69,9 @@ export default async function IntegrationsPage() {
                   <tr key={file.name} className="border-t border-zinc-100">
                     <td className="px-3 py-2 font-mono">{file.name}</td>
                     <td className="px-3 py-2">{file.exists ? "found" : "missing"}</td>
+                    <td className="px-3 py-2 whitespace-nowrap text-zinc-600">
+                      {file.modifiedAt ? file.modifiedAt.toLocaleString() : "n/a"}
+                    </td>
                     <td className="px-3 py-2 font-mono text-xs text-zinc-500">{file.path}</td>
                   </tr>
                 ))}
@@ -73,6 +82,7 @@ export default async function IntegrationsPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 pt-3">
             <div className="text-sm text-zinc-600">
               <div>Last sync: {lastSyncLabel}</div>
+              <div>Latest source update: {sourceModifiedLabel}</div>
               {status.config?.lastSyncMessage && <div>{status.config.lastSyncMessage}</div>}
             </div>
             <form action={syncGarminIntegration}>
