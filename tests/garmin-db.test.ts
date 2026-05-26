@@ -51,6 +51,11 @@ test("imports GarminDB workouts and health idempotently", async () => {
   assert.equal(first.healthCreated, 1);
   assert.equal(first.healthUpdated, 0);
 
+  await prisma.workout.update({
+    where: { source_externalId: { source: "garmin", externalId: "garmin:12345" } },
+    data: { notes: "custom race notes" },
+  });
+
   const second = await importGarminDb(sourceDir);
   assert.equal(second.workoutsCreated, 0);
   assert.equal(second.workoutsUpdated, 2);
@@ -70,6 +75,7 @@ test("imports GarminDB workouts and health idempotently", async () => {
   assert.equal(runWorkout.durationMin, 43);
   assert.equal(runWorkout.distance, 4.2);
   assert.equal(runWorkout.distanceUnit, "mi");
+  assert.equal(runWorkout.notes, "custom race notes");
   assert.equal(runWorkout.metrics.filter((metric) => metric.key === "avg_hr").length, 1);
   assert.equal(runWorkout.metrics.some((metric) => metric.key === "hr_zone_2_time_s"), true);
   const timeline = runWorkout.metrics.find((metric) => metric.key === "record_timeline");

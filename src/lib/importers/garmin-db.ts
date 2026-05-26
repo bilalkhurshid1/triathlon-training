@@ -284,7 +284,6 @@ export async function importGarminDb(sourcePath: string | null | undefined): Pro
         durationMin: workout.durationMin,
         distance: workout.distance,
         distanceUnit: workout.distanceUnit,
-        notes: workout.notes,
         importId: importRecord.id,
       },
       create: {
