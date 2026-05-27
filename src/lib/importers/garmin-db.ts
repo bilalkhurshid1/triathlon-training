@@ -1,6 +1,8 @@
+import { execFile } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { promisify } from "node:util";
 import Database from "better-sqlite3";
 import { prisma } from "@/lib/db";
 import { isoDay } from "@/lib/dates";
@@ -9,6 +11,11 @@ export const GARMIN_PROVIDER = "garmin";
 export const GARMIN_WORKOUT_SOURCE = "garmin";
 export const GARMIN_IMPORT_SOURCE = "garmin_db";
 export const DEFAULT_GARMIN_DB_DIR = "~/HealthData/DBs";
+export const DEFAULT_GARMINDB_CLI_PATH = "~/.venvs/garmindb/bin/garmindb_cli.py";
+
+const execFileAsync = promisify(execFile);
+const GARMINDB_REFRESH_ARGS = ["--download", "--import", "--analyze", "--all", "--latest"] as const;
+const GARMINDB_REFRESH_TIMEOUT_MS = 5 * 60 * 1000;
 
 const REQUIRED_GARMIN_DB_FILES = [
   "garmin_activities.db",
@@ -97,6 +104,12 @@ export type GarminImportResult = GarminDbReadResult & {
   healthUpdated: number;
 };
 
+export type GarminDbRefreshResult = {
+  cliPath: string;
+  refreshedAt: Date;
+  output: string;
+};
+
 type GarminActivityRow = Record<string, unknown>;
 type GarminRecordRow = Record<string, unknown>;
 type GarminDailySummaryRow = Record<string, unknown>;
@@ -109,11 +122,22 @@ export class GarminDbImportError extends Error {
   }
 }
 
+export class GarminDbRefreshError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "GarminDbRefreshError";
+  }
+}
+
 export function expandGarminDbPath(input: string | null | undefined): string {
   const sourcePath = input?.trim() || DEFAULT_GARMIN_DB_DIR;
-  if (sourcePath === "~") return os.homedir();
-  if (sourcePath.startsWith("~/")) return path.join(os.homedir(), sourcePath.slice(2));
-  return path.resolve(/* turbopackIgnore: true */ sourcePath);
+  return expandUserPath(sourcePath);
+}
+
+function expandUserPath(input: string): string {
+  if (input === "~") return os.homedir();
+  if (input.startsWith("~/")) return path.join(os.homedir(), input.slice(2));
+  return path.resolve(/* turbopackIgnore: true */ input);
 }
 
 export function getGarminRequiredFileStatuses(sourcePath: string | null | undefined): GarminFileStatus[] {
@@ -166,29 +190,64 @@ export async function updateGarminSourcePath(sourcePath: string | null): Promise
   });
 }
 
+export async function refreshGarminDbExport(): Promise<GarminDbRefreshResult> {
+  const cliPath = expandUserPath(process.env.GARMINDB_CLI_PATH?.trim() || DEFAULT_GARMINDB_CLI_PATH);
+  if (!fs.existsSync(/* turbopackIgnore: true */ cliPath)) {
+    throw new GarminDbRefreshError(
+      `GarminDB CLI was not found at ${cliPath}. Set GARMINDB_CLI_PATH to the garmindb_cli.py path.`
+    );
+  }
+
+  try {
+    const { stdout, stderr } = await execFileAsync(cliPath, [...GARMINDB_REFRESH_ARGS], {
+      cwd: os.homedir(),
+      env: process.env,
+      timeout: GARMINDB_REFRESH_TIMEOUT_MS,
+      maxBuffer: 16 * 1024 * 1024,
+    });
+
+    return {
+      cliPath,
+      refreshedAt: new Date(),
+      output: compactCommandOutput(stdout, stderr),
+    };
+  } catch (error) {
+    throw new GarminDbRefreshError(formatRefreshError(error));
+  }
+}
+
 export async function syncGarminFromConfiguredPath(): Promise<GarminImportResult> {
   const config = await prisma.integrationConfig.upsert({
     where: { provider: GARMIN_PROVIDER },
     update: {
       lastSyncStatus: "running",
-      lastSyncMessage: "Sync started.",
+      lastSyncMessage: "Downloading latest Garmin Connect data.",
     },
     create: {
       provider: GARMIN_PROVIDER,
       sourcePath: DEFAULT_GARMIN_DB_DIR,
       lastSyncStatus: "running",
-      lastSyncMessage: "Sync started.",
+      lastSyncMessage: "Downloading latest Garmin Connect data.",
     },
   });
 
   try {
+    await refreshGarminDbExport();
+    await prisma.integrationConfig.update({
+      where: { provider: GARMIN_PROVIDER },
+      data: {
+        lastSyncStatus: "running",
+        lastSyncMessage: "Importing refreshed GarminDB data.",
+      },
+    });
+
     const result = await importGarminDb(config.sourcePath ?? DEFAULT_GARMIN_DB_DIR);
     await prisma.integrationConfig.update({
       where: { provider: GARMIN_PROVIDER },
       data: {
         lastSyncAt: new Date(),
         lastSyncStatus: "success",
-        lastSyncMessage: `Imported ${result.workoutsCreated} new workouts, updated ${result.workoutsUpdated}, and synced ${result.dailyHealth.length} health days.`,
+        lastSyncMessage: `Downloaded latest Garmin data, imported ${result.workoutsCreated} new workouts, updated ${result.workoutsUpdated}, and synced ${result.dailyHealth.length} health days.`,
       },
     });
     return result;
@@ -838,6 +897,41 @@ function asNumber(value: unknown): number | null {
 function asInteger(value: unknown): number | null {
   const number = asNumber(value);
   return number == null ? null : Math.round(number);
+}
+
+type ExecFileFailure = Error & {
+  code?: string | number | null;
+  signal?: NodeJS.Signals | null;
+  stdout?: string | Buffer;
+  stderr?: string | Buffer;
+  killed?: boolean;
+};
+
+function compactCommandOutput(stdout: string | Buffer, stderr: string | Buffer): string {
+  return [stdout, stderr]
+    .map((value) => value.toString().trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+function formatRefreshError(error: unknown): string {
+  if (!(error instanceof Error)) return "GarminDB refresh failed.";
+
+  const execError = error as ExecFileFailure;
+  const output = compactCommandOutput(execError.stdout ?? "", execError.stderr ?? "");
+  const details = lastLines(output, 8) || error.message;
+  const code = execError.signal ?? execError.code;
+  const suffix = code ? ` (${code})` : execError.killed ? " (timeout)" : "";
+  return `GarminDB refresh failed${suffix}: ${details}`;
+}
+
+function lastLines(value: string, count: number): string {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(-count)
+    .join(" ");
 }
 
 function errorMessage(error: unknown): string {
