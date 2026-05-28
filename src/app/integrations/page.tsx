@@ -7,6 +7,7 @@ import {
   syncGarminIntegration,
   updateGarminIntegration,
 } from "@/app/actions/integrations";
+import { GarminSyncSubmit } from "@/components/garmin-sync-form";
 
 export default async function IntegrationsPage() {
   await connection();
@@ -86,13 +87,7 @@ export default async function IntegrationsPage() {
               {status.config?.lastSyncMessage && <div>{status.config.lastSyncMessage}</div>}
             </div>
             <form action={syncGarminIntegration}>
-              <button
-                type="submit"
-                disabled={!status.ready}
-                className="rounded bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-300"
-              >
-                Sync Garmin
-              </button>
+              <GarminSyncSubmit disabled={!status.ready} />
             </form>
           </div>
         </div>

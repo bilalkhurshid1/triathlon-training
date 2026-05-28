@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { syncGarminIntegration } from "@/app/actions/integrations";
+import { GarminSyncSubmit } from "@/components/garmin-sync-form";
 import { prisma } from "@/lib/db";
 import { WORKOUT_TYPES } from "@/lib/validators";
 import { isoDay } from "@/lib/dates";
@@ -17,14 +19,19 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Sea
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <h1 className="text-2xl font-semibold">Workouts</h1>
-        <Link
-          href="/workouts/new"
-          className="rounded bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700"
-        >
-          + Add workout
-        </Link>
+        <div className="flex flex-col items-end gap-2">
+          <Link
+            href="/workouts/new"
+            className="rounded bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700"
+          >
+            + Add workout
+          </Link>
+          <form action={syncGarminIntegration}>
+            <GarminSyncSubmit idleLabel="Sync from Garmin" />
+          </form>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-1 text-sm">
