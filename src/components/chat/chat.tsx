@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useRouter } from "next/navigation";
@@ -15,6 +15,8 @@ type Props = {
 export function Chat({ sessionId, initialMessages }: Props) {
   const router = useRouter();
   const hasRefreshedRef = useRef(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({
@@ -31,7 +33,15 @@ export function Chat({ sessionId, initialMessages }: Props) {
   });
 
   const [input, setInput] = useState("");
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const isStreaming = status === "submitted" || status === "streaming";
+
+  useLayoutEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+
+    scrollContainer.scrollTop = scrollContainer.scrollHeight;
+  }, [sessionId, messages.length]);
 
   function submitMessage() {
     if (!input.trim() || isStreaming) return;
@@ -39,31 +49,102 @@ export function Chat({ sessionId, initialMessages }: Props) {
     setInput("");
   }
 
+  async function writeClipboardText(text: string) {
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return;
+      } catch {
+        // Fall back for browsers that block Clipboard API writes in embedded contexts.
+      }
+    }
+
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.top = "-9999px";
+    textarea.style.left = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.select();
+
+    try {
+      const didCopy = document.execCommand("copy");
+      if (!didCopy) throw new Error("Copy command failed");
+    } finally {
+      document.body.removeChild(textarea);
+    }
+  }
+
+  async function copyMessage(id: string, text: string) {
+    try {
+      await writeClipboardText(text);
+    } catch {
+      return;
+    }
+
+    setCopiedMessageId(id);
+    window.setTimeout(() => {
+      setCopiedMessageId((currentId) => (currentId === id ? null : currentId));
+    }, 1500);
+  }
+
   return (
     <div className="rounded border border-zinc-200 bg-white flex flex-col flex-1 min-h-0">
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto px-4 py-3 space-y-3"
+      >
         {messages.length === 0 && (
           <div className="text-sm text-zinc-500">
             Ask the coach. They have your last 14 days of workouts, your profile, and your race date.
           </div>
         )}
         {messages.map((m) => {
+          const isUser = m.role === "user";
           const text = m.parts
             .filter((p) => p.type === "text")
             .map((p) => (p as { type: "text"; text: string }).text)
             .join("");
           return (
-            <div key={m.id} className="text-sm">
-              <span className="text-xs uppercase tracking-wide text-zinc-500 block mb-0.5">
-                {m.role === "assistant" ? "Coach" : "You"}
-              </span>
-              {m.role === "assistant" ? (
-                <div className="prose prose-sm prose-zinc max-w-none">
-                  <Markdown>{text}</Markdown>
+            <div
+              key={m.id}
+              className={`flex text-sm ${isUser ? "justify-end" : "justify-start"}`}
+            >
+              <div className={`max-w-[82%] ${isUser ? "items-end" : "items-start"} flex flex-col`}>
+                <div
+                  className={`mb-1 flex w-full items-center gap-2 ${
+                    isUser ? "justify-end" : "justify-between"
+                  }`}
+                >
+                  <span
+                    className={`text-xs uppercase tracking-wide ${
+                      isUser ? "font-semibold text-zinc-700" : "text-zinc-500"
+                    }`}
+                  >
+                    {isUser ? "You" : "Coach"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => copyMessage(m.id, text)}
+                    className="rounded px-1.5 py-0.5 text-[11px] font-normal text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                    aria-label={`Copy ${isUser ? "your" : "coach"} message`}
+                  >
+                    {copiedMessageId === m.id ? "Copied" : "Copy"}
+                  </button>
                 </div>
-              ) : (
-                <span className="whitespace-pre-wrap">{text}</span>
-              )}
+                {isUser ? (
+                  <div className="rounded-lg bg-zinc-900 px-3 py-2 text-white shadow-sm">
+                    <span className="whitespace-pre-wrap">{text}</span>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2">
+                    <div className="prose prose-sm prose-zinc max-w-none">
+                      <Markdown>{text}</Markdown>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}
@@ -73,6 +154,7 @@ export function Chat({ sessionId, initialMessages }: Props) {
             error: {error.message}
           </div>
         )}
+        <div ref={bottomRef} />
       </div>
 
       <form
